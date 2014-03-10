@@ -1,0 +1,4 @@
+*.class
+config/newrelic.properties
+newrelic_procmon_plugin.jar
+procmon_plugin.zip
