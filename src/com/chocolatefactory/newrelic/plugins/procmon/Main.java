@@ -17,7 +17,7 @@ public class Main {
     	Runner runner = new Runner();
     	
     	Config pluginConfig = ConfigFactory.parseFile(new File("config/ProcmonPlugin.config"));
-		String thisOS, thisName;
+		String thisOS, thisName, thisLocation;
 		Boolean isDebug;
 		
 		if (pluginConfig.hasPath("debug")) {
@@ -37,15 +37,24 @@ public class Main {
 		} else {
 			thisOS = System.getProperty("os.name").toLowerCase();
 		}
-				
-		if (!pluginConfig.atPath("processes").isEmpty()) {
-			for (String thisCommand : pluginConfig.getStringList("processes")) {
-				runner.register(new Procmon(kProcmonGuid, kAgentVersion, thisName, thisOS, thisCommand, isDebug));
+
+		
+		if (!pluginConfig.atPath("PID_Location").isEmpty()) {
+			thisLocation = pluginConfig.getString("PID_Location").toLowerCase();
+		} else {
+				thisLocation = "";
+				System.out.println("Error with configuration: PID Files Location is not configured");
+				System.exit (-1);
+			}
+
+		if (!pluginConfig.atPath("PID_Files").isEmpty()) {
+			for (String thisCommand : pluginConfig.getStringList("PID_Files")) {
+				runner.register(new Procmon(kProcmonGuid, kAgentVersion, thisName, thisOS, thisLocation, thisCommand, isDebug));
 			}
 		} else {
-			System.out.println("Error with configuration: no processes configured");
-			System.exit (-1);
-		}
+				System.out.println("Error with configuration: no processes or PID Files configured");
+				System.exit (-1);
+			}
     	
 		if (isDebug) {
 			System.out.println("OS: " + thisOS);
