@@ -1,7 +1,10 @@
 package com.chocolatefactory.newrelic.plugins.procmon;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.FileInputStream;
 import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,11 +39,12 @@ public class Procmon extends Agent {
 	    put(kProcStatus, "status");
 	}};
 			
-	String command, hostname, ostype, name;
+	String command, hostname, ostype, name, location;
 	Boolean debug;
     
-	public Procmon(String guid, String agentversion, String hostname, String ostype, String command, Boolean debug) {
+	public Procmon(String guid, String agentversion, String hostname, String ostype, String location, String command, Boolean debug) {
 		super(guid, agentversion);
+		this.location = location;
 		this.command = command;
 		this.ostype = ostype;
 		this.debug = debug;
@@ -70,6 +74,64 @@ public class Procmon extends Agent {
 		}
 	}
 	
+	private String getPIDFromFile() {
+		String line = "";
+		String directory = "";
+		String PIDVal = "";
+		String getFileCmdString = "powershell.exe -Command Get-ChildItem -recurse " + this.location + " -include " + this.command;
+
+		if (this.debug) {
+			System.out.println("The command string is " + getFileCmdString);
+		}
+		
+		try {
+			Process tasklist = Runtime.getRuntime().exec(getFileCmdString);	
+			BufferedReader commandOutput = new BufferedReader(new InputStreamReader(tasklist.getInputStream()));
+
+			while ((line = commandOutput.readLine()) != null) {
+				if (line.contains("Directory:")) {
+
+					if (line.lastIndexOf(":") > line.indexOf("Directory:")+"Directory:".length()) {
+						directory = line.substring(line.indexOf("Directory:")+"Directory:".length()+1);
+					} else {
+						line = commandOutput.readLine();
+						directory = line.substring(line.lastIndexOf(":")-1);
+					}
+				if (this.debug) {
+					System.out.println("Directory is " + directory);
+				}
+				}
+			}
+		} catch (Exception e) {
+			System.out.println("Encountered an error attempting to get the PID file " + this.command);
+			e.printStackTrace();
+		}
+		
+		try {
+            //open the PID file for reading
+            FileInputStream file = new FileInputStream(directory+"\\"+this.command);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(file));
+          
+            //reading the PID from file
+            PIDVal = reader.readLine();
+            
+            //Print the PID value
+            if (this.debug){
+                System.out.println("PID contains "+PIDVal);
+            }
+            
+            reader.close();
+                  
+        } catch (FileNotFoundException ex) {
+			System.out.println("Encountered an error attempting to check process " + this.command);
+			ex.printStackTrace();
+        } catch (IOException ex) {
+			System.out.println("Encountered an error attempting to check process " + this.command);
+			ex.printStackTrace();
+        }
+		return PIDVal;
+	}
+	
 	private HashMap <String, Number> winProcCommand() {
 		int procCount = 0;
 		int memUsage = 0;
@@ -79,7 +141,12 @@ public class Procmon extends Agent {
 		String[] headers = null;
 		HashMap<String, Number> results = new HashMap<String, Number>();
 		Boolean firstLine = true;
-		String taskString = "tasklist /fo CSV /v /fi \"imagename eq " + this.command + "\"";
+		String taskString = "tasklist /fo CSV /v /fi \"PID eq " + getPIDFromFile() + "\"";
+		
+		if (this.debug){
+			System.out.println("The tasklist command is "+taskString);
+		}
+
 		try {
 			Process tasklist = Runtime.getRuntime().exec(taskString);
 			BufferedReader tasklistOutput = new BufferedReader(new InputStreamReader(tasklist.getInputStream()));
